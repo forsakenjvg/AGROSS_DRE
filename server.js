@@ -6,6 +6,7 @@ const NodeCache = require('node-cache');
 const compression = require('compression');
 const helmet = require('helmet');
 const path = require('path');
+const XLSX = require('xlsx');
 
 const app = express();
 const PORT = process.env.PORT || 13456;
@@ -642,6 +643,119 @@ app.get('/api/dre/departamentos', async (req, res) => {
   }
 });
 
+// Endpoint para dados mensais otimizado
+app.get('/api/dre/mensal', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { dataInicio, dataFim, departamento } = req.query;
+    console.log('📊 [API-Monthly] Request - Filtros:', { dataInicio, dataFim, departamento });
+
+    const cacheKey = `mensal_${JSON.stringify(req.query)}`;
+    const cachedData = dataCache.get(cacheKey);
+
+    if (cachedData) {
+      const duration = Date.now() - startTime;
+      console.log(`⚡ [API-Monthly] Cache hit - ${duration}ms`);
+      return res.json(cachedData);
+    }
+
+    const conditions = [];
+    if (dataInicio) conditions.push(`data >= '${dataInicio}'`);
+    if (dataFim) conditions.push(`data <= '${dataFim}'`);
+    if (departamento) conditions.push(`departamento = '${departamento}'`);
+
+    // Query otimizada para dados mensais agregados
+    let sqlQuery = `
+      SELECT
+        TO_CHAR(data::date, 'YYYY-MM') as mes,
+        CASE 
+          WHEN linha_dre LIKE '%RECEITA OPERACIONAL LIQUIDA%' THEN 'Receita Operacional'
+          WHEN linha_dre LIKE '%CPV/CMV/CSP%' THEN 'CPV/CMV/CSP'
+          WHEN linha_dre LIKE '%DESPESAS OPERACIONAIS%' AND linha_dre NOT LIKE '%OUTRAS%' THEN 'Despesas Operacionais'
+          WHEN linha_dre LIKE '%OUTRAS RECEITAS OPERACIONAIS%' THEN 'Outras Receitas Oper.'
+          WHEN linha_dre LIKE '%OUTRAS DESPESAS OPERACIONAIS%' THEN 'Outras Despesas Oper.'
+          WHEN linha_dre LIKE '%RECEITAS FINANCEIRAS%' THEN 'Receitas Financeiras'
+          WHEN linha_dre LIKE '%DESPESAS FINANCEIRAS%' THEN 'Despesas Financeiras'
+          WHEN linha_dre LIKE '%RESULTADO NAO OPERACIONAL%' THEN 'Resultado Não Oper.'
+          WHEN linha_dre LIKE '%PROVISAO PARA IR E CSLL%' THEN 'Provisão IR/CSLL'
+        END as categoria_dre,
+        SUM(vl_rateado) as valor_total
+      FROM (${DRE_SQL_BASE}) monthly_data
+    `;
+
+    if (conditions.length > 0) {
+      sqlQuery += ` WHERE ${conditions.join(' AND ')}`;
+    }
+
+    sqlQuery += `
+      GROUP BY TO_CHAR(data::date, 'YYYY-MM'), categoria_dre
+      ORDER BY mes, categoria_dre
+    `;
+
+    console.log('🔍 [API-Monthly] Executando consulta SQL mensal...');
+    const sqlStartTime = Date.now();
+    const result = await executeSQL(sqlQuery);
+    const sqlDuration = Date.now() - sqlStartTime;
+    console.log(`✅ [API-Monthly] SQL executado em ${sqlDuration}ms - ${result?.length || 0} registros`);
+
+    // Processar dados para estrutura de gráfico
+    const monthlyData = {};
+    const categorias = new Set();
+
+    (result || []).forEach(row => {
+      const mes = row.mes;
+      const categoria = row.categoria_dre;
+      const valor = parseFloat(row.valor_total || 0);
+
+      categorias.add(categoria);
+
+      if (!monthlyData[mes]) {
+        monthlyData[mes] = {};
+      }
+      monthlyData[mes][categoria] = valor;
+    });
+
+    // Converter para arrays para o Chart.js
+    const meses = Object.keys(monthlyData).sort();
+    const datasets = Array.from(categorias).map(categoria => {
+      const cores = {
+        'Receita Operacional': 'rgba(25, 135, 84, 0.8)',
+        'CPV/CMV/CSP': 'rgba(255, 193, 7, 0.8)',
+        'Despesas Operacionais': 'rgba(220, 53, 69, 0.8)',
+        'Outras Receitas Oper.': 'rgba(13, 202, 240, 0.8)',
+        'Outras Despesas Oper.': 'rgba(255, 127, 80, 0.8)',
+        'Receitas Financeiras': 'rgba(40, 167, 69, 0.8)',
+        'Despesas Financeiras': 'rgba(220, 53, 69, 0.6)',
+        'Resultado Não Oper.': 'rgba(108, 117, 125, 0.8)',
+        'Provisão IR/CSLL': 'rgba(102, 16, 242, 0.8)'
+      };
+
+      return {
+        label: categoria,
+        data: meses.map(mes => monthlyData[mes][categoria] || 0),
+        backgroundColor: cores[categoria] || 'rgba(153, 102, 255, 0.8)',
+        borderColor: (cores[categoria] || 'rgba(153, 102, 255, 0.8)').replace('0.8', '1'),
+        borderWidth: 1
+      };
+    });
+
+    const response = {
+      labels: meses,
+      datasets: datasets
+    };
+
+    const totalDuration = Date.now() - startTime;
+    console.log(`🚀 [API-Monthly] Request completa em ${totalDuration}ms`);
+
+    dataCache.set(cacheKey, response);
+    res.json(response);
+
+  } catch (error) {
+    console.error('Erro ao buscar dados mensais:', error);
+    res.status(500).json({ error: 'Erro ao buscar dados mensais', details: error.message });
+  }
+});
+
 // Endpoint para limpar cache
 app.post('/api/cache/clear', (req, res) => {
   dataCache.flushAll();
@@ -661,6 +775,222 @@ app.get('/api/health', (req, res) => {
       token: tokenCache.getStats()
     }
   });
+});
+
+// Endpoint para exportação em CSV
+app.get('/api/export/csv', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const {
+      dataInicio,
+      dataFim,
+      departamento,
+      linhaDRE,
+      type = 'detalhado'
+    } = req.query;
+
+    console.log('📊 [API-Export-CSV] Request - Filtros:', { dataInicio, dataFim, departamento, linhaDRE, type });
+
+    const cacheKey = `export_csv_${JSON.stringify(req.query)}`;
+    const cachedData = dataCache.get(cacheKey);
+
+    if (cachedData) {
+      const duration = Date.now() - startTime;
+      console.log(`⚡ [API-Export-CSV] Cache hit - ${duration}ms`);
+      return res.setHeader('Content-Type', 'text/csv')
+               .setHeader('Content-Disposition', `attachment; filename="dre_export_${new Date().toISOString().split('T')[0]}.csv"`)
+               .send(cachedData);
+    }
+
+    const conditions = [];
+    if (dataInicio) conditions.push(`data >= '${dataInicio}'`);
+    if (dataFim) conditions.push(`data <= '${dataFim}'`);
+    if (departamento) conditions.push(`departamento = '${departamento}'`);
+    if (linhaDRE) conditions.push(`linha_dre = '${linhaDRE}'`);
+
+    let sqlQuery;
+    
+    if (type === 'resumido') {
+      // Exportação resumida - agrupada por linha DRE e departamento
+      sqlQuery = `
+        SELECT
+          linha_dre,
+          departamento,
+          SUM(vl_rateado) as valor_total,
+          COUNT(*) as quantidade_lancamentos
+        FROM (${DRE_SQL_BASE}) export_data
+        ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}
+        GROUP BY linha_dre, departamento
+        ORDER BY linha_dre, departamento
+      `;
+    } else {
+      // Exportação detalhada - todos os campos
+      sqlQuery = buildFilteredQuery(
+        DRE_SQL_BASE,
+        conditions,
+        'data DESC, linha_dre, departamento',
+        10000, // Limite para exportação
+        0
+      );
+    }
+
+    console.log('🔍 [API-Export-CSV] Executando consulta SQL...');
+    const sqlStartTime = Date.now();
+    const result = await executeSQL(sqlQuery);
+    const sqlDuration = Date.now() - sqlStartTime;
+    console.log(`✅ [API-Export-CSV] SQL executado em ${sqlDuration}ms - ${result?.length || 0} registros`);
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: 'Nenhum dado encontrado para exportação' });
+    }
+
+    // Criar CSV
+    const headers = Object.keys(result[0]);
+    const csvContent = [
+      headers.join(','),
+      ...result.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          // Escapar aspas e adicionar aspas se contiver vírgula ou aspas
+          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value !== null && value !== undefined ? value : '';
+        }).join(',')
+      )
+    ].join('\n');
+
+    const totalDuration = Date.now() - startTime;
+    console.log(`🚀 [API-Export-CSV] Exportação completa em ${totalDuration}ms`);
+
+    // Cache do CSV
+    dataCache.set(cacheKey, csvContent);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="dre_export_${type}_${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csvContent);
+
+  } catch (error) {
+    console.error('Erro na exportação CSV:', error);
+    res.status(500).json({ error: 'Erro ao exportar dados', details: error.message });
+  }
+});
+
+// Endpoint para exportação em Excel
+app.get('/api/export/excel', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const {
+      dataInicio,
+      dataFim,
+      departamento,
+      linhaDRE,
+      type = 'detalhado'
+    } = req.query;
+
+    console.log('📊 [API-Export-Excel] Request - Filtros:', { dataInicio, dataFim, departamento, linhaDRE, type });
+
+    const cacheKey = `export_excel_${JSON.stringify(req.query)}`;
+    const cachedData = dataCache.get(cacheKey);
+
+    if (cachedData) {
+      const duration = Date.now() - startTime;
+      console.log(`⚡ [API-Export-Excel] Cache hit - ${duration}ms`);
+      return res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+               .setHeader('Content-Disposition', `attachment; filename="dre_export_${new Date().toISOString().split('T')[0]}.xlsx"`)
+               .send(cachedData);
+    }
+
+    const conditions = [];
+    if (dataInicio) conditions.push(`data >= '${dataInicio}'`);
+    if (dataFim) conditions.push(`data <= '${dataFim}'`);
+    if (departamento) conditions.push(`departamento = '${departamento}'`);
+    if (linhaDRE) conditions.push(`linha_dre = '${linhaDRE}'`);
+
+    let result;
+    
+    if (type === 'resumido') {
+      // Exportação resumida - agrupada por linha DRE e departamento
+      const sqlQuery = `
+        SELECT
+          linha_dre,
+          departamento,
+          SUM(vl_rateado) as valor_total,
+          COUNT(*) as quantidade_lancamentos
+        FROM (${DRE_SQL_BASE}) export_data
+        ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}
+        GROUP BY linha_dre, departamento
+        ORDER BY linha_dre, departamento
+      `;
+      
+      console.log('🔍 [API-Export-Excel] Executando consulta SQL resumida...');
+      const sqlStartTime = Date.now();
+      result = await executeSQL(sqlQuery);
+      const sqlDuration = Date.now() - sqlStartTime;
+      console.log(`✅ [API-Export-Excel] SQL resumido executado em ${sqlDuration}ms - ${result?.length || 0} registros`);
+    } else {
+      // Exportação detalhada - todos os campos
+      const sqlQuery = buildFilteredQuery(
+        DRE_SQL_BASE,
+        conditions,
+        'data DESC, linha_dre, departamento',
+        10000, // Limite para exportação
+        0
+      );
+      
+      console.log('🔍 [API-Export-Excel] Executando consulta SQL detalhada...');
+      const sqlStartTime = Date.now();
+      result = await executeSQL(sqlQuery);
+      const sqlDuration = Date.now() - sqlStartTime;
+      console.log(`✅ [API-Export-Excel] SQL detalhada executado em ${sqlDuration}ms - ${result?.length || 0} registros`);
+    }
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: 'Nenhum dado encontrado para exportação' });
+    }
+
+    // Criar workbook e worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(result, {
+      header: Object.keys(result[0]),
+      skipHeader: false
+    });
+
+    // Formatação condicional básica para valores
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let R = range.s.r; R <= range.e.r; R++) {
+      for (let C = 0; C <= range.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        const cell = ws[cellAddress];
+        
+        if (cell && C === Object.keys(result[0]).indexOf('vl_rateado') || C === Object.keys(result[0]).indexOf('valor_total')) {
+          // Formatar como número
+          cell.t = 'n';
+          if (cell.v) cell.v = parseFloat(cell.v);
+        }
+      }
+    }
+
+    // Adicionar worksheet ao workbook
+    XLSX.utils.book_append_sheet(wb, ws, type === 'resumido' ? 'DRE_Resumido' : 'DRE_Detalhado');
+
+    // Gerar buffer
+    const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const totalDuration = Date.now() - startTime;
+    console.log(`🚀 [API-Export-Excel] Exportação completa em ${totalDuration}ms`);
+
+    // Cache do buffer
+    dataCache.set(cacheKey, excelBuffer);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="dre_export_${type}_${new Date().toISOString().split('T')[0]}.xlsx"`);
+    res.send(excelBuffer);
+
+  } catch (error) {
+    console.error('Erro na exportação Excel:', error);
+    res.status(500).json({ error: 'Erro ao exportar dados', details: error.message });
+  }
 });
 
 // Error handling middleware

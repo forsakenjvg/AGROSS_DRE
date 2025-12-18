@@ -4,9 +4,12 @@ class DREDashboard {
         this.currentPage = 1;
         this.pageSize = 50;
         this.currentFilters = {};
-        this.dreChart = null;
         this.deptoChart = null;
+        this.monthlyChart = null;
         this.loading = false;
+        this.sortColumn = null;
+        this.sortDirection = 'asc';
+        this.currentTableData = [];
         
         this.init();
     }
@@ -28,9 +31,38 @@ class DREDashboard {
             this.applyFilters();
         });
 
-        // Seletor de período pré-definido
-        document.getElementById('periodoPredefinido').addEventListener('change', (e) => {
-            this.aplicarPeriodoPredefinido(e.target.value);
+        // Seletores de períodos (cards e botões)
+        // Event delegation para cards
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.periodo-card')) {
+                const card = e.target.closest('.periodo-card');
+                const periodo = card.dataset.periodo;
+                this.selecionarPeriodo(periodo);
+                this.aplicarPeriodoPredefinido(periodo);
+            }
+            if (e.target.closest('.periodo-btn')) {
+                const btn = e.target.closest('.periodo-btn');
+                const periodo = btn.dataset.periodo;
+                this.selecionarPeriodo(periodo);
+                this.aplicarPeriodoPredefinido(periodo);
+            }
+        });
+
+        // Seletor antigo (mantido por compatibilidade)
+        const periodoSelect = document.getElementById('periodoPredefinido');
+        if (periodoSelect) {
+            periodoSelect.addEventListener('change', (e) => {
+                this.aplicarPeriodoPredefinido(e.target.value);
+            });
+        }
+
+        // Ordenação da tabela
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('th.sortable')) {
+                const th = e.target.closest('th.sortable');
+                const column = th.dataset.column;
+                this.ordenarTabela(column);
+            }
         });
 
         // Botões
@@ -68,8 +100,34 @@ class DREDashboard {
 
     setDefaultDates() {
         // Define o período padrão como "Ano Atual"
-        document.getElementById('periodoPredefinido').value = 'ano_atual';
+        this.selecionarPeriodo('ano_atual');
         this.aplicarPeriodoPredefinido('ano_atual');
+    }
+
+    selecionarPeriodo(periodo) {
+        // Remove todas as classes active dos cards e botões
+        document.querySelectorAll('.periodo-card').forEach(card => {
+            card.classList.remove('active');
+        });
+        document.querySelectorAll('.periodo-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Adiciona a classe active ao elemento selecionado
+        const selectedCard = document.querySelector(`.periodo-card[data-periodo="${periodo}"]`);
+        const selectedBtn = document.querySelector(`.periodo-btn[data-periodo="${periodo}"]`);
+        
+        if (selectedCard) {
+            selectedCard.classList.add('active');
+        }
+        if (selectedBtn) {
+            selectedBtn.classList.add('active');
+        }
+        
+        // Se for período custom, limpa as seleções
+        if (periodo === 'custom') {
+            // Deixa os elementos sem active quando for custom
+        }
     }
 
     aplicarPeriodoPredefinido(periodo) {
@@ -139,7 +197,8 @@ class DREDashboard {
                 this.loadSummaryData(),
                 this.loadDepartmentData(),
                 this.loadDetailedData(),
-                this.loadDRELines()
+                this.loadDRELines(),
+                this.loadMonthlyData()
             ]);
         } catch (error) {
             console.error('Erro ao carregar dados iniciais:', error);
@@ -236,6 +295,27 @@ class DREDashboard {
         }
     }
 
+    async loadMonthlyData() {
+        try {
+            console.log('🔄 [Monthly] Iniciando carregamento...');
+            const queryString = this.buildQueryString();
+            console.log('📊 [Monthly] QueryString:', queryString);
+            const startTime = performance.now();
+            
+            const response = await fetch('/api/dre/mensal?' + queryString);
+            const data = await response.json();
+            
+            const endTime = performance.now();
+            console.log(`✅ [Monthly] Dados carregados em ${(endTime - startTime).toFixed(2)}ms`, data);
+
+            this.updateMonthlyChart(data);
+            
+        } catch (error) {
+            console.error('❌ [Monthly] Erro ao carregar:', error);
+            throw error;
+        }
+    }
+
     updateSummaryCards(data) {
         const receitaOperacional = data.find(item => 
             item.linha_dre.includes('RECEITA OPERACIONAL LIQUIDA')
@@ -268,10 +348,13 @@ class DREDashboard {
         // Receita - CPV - Despesas Operacionais + Outras Receitas Operacionais - Outras Despesas Operacionais
         const resultadoOperacional = receitaOperacional + cpvCmv + despesasOperacionais + outrasReceitasOperacionais + outrasDespesasOperacionais;
 
+        // Atualizar todos os cards
         document.getElementById('receitaOperacional').textContent = 
             this.formatCurrency(receitaOperacional);
+        document.getElementById('cpvCmv').textContent = 
+            this.formatCurrency(Math.abs(cpvCmv));
         document.getElementById('despesasOperacionais').textContent = 
-            this.formatCurrency(Math.abs(despesasOperacionais + cpvCmv + outrasDespesasOperacionais));
+            this.formatCurrency(Math.abs(despesasOperacionais + outrasDespesasOperacionais));
         document.getElementById('resultadoOperacional').textContent = 
             this.formatCurrency(resultadoOperacional);
         document.getElementById('totalLancamentos').textContent = 
@@ -384,6 +467,81 @@ class DREDashboard {
                             }
                         }
                     }
+                }
+            }
+        });
+    }
+
+    updateMonthlyChart(data) {
+        const ctx = document.getElementById('monthlyChart').getContext('2d');
+        
+        if (this.monthlyChart) {
+            this.monthlyChart.destroy();
+        }
+
+        // Formatar labels dos meses (de 2024-01 para Jan/2024)
+        const formattedLabels = data.labels.map(mes => {
+            const [ano, mesNum] = mes.split('-');
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            return `${meses[parseInt(mesNum) - 1]}/${ano}`;
+        });
+
+        this.monthlyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: formattedLabels,
+                datasets: data.datasets.map(dataset => ({
+                    ...dataset,
+                    fill: false,
+                    tension: 0.1
+                }))
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            padding: 10,
+                            font: {
+                                size: 11
+                            }
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: (context) => {
+                                return `${context.dataset.label}: ${this.formatCurrency(context.parsed.y)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Mês'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Valor (R$)'
+                        },
+                        ticks: {
+                            callback: (value) => this.formatCurrency(value, true)
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
                 }
             }
         });
