@@ -28,6 +28,11 @@ class DREDashboard {
             this.applyFilters();
         });
 
+        // Seletor de período pré-definido
+        document.getElementById('periodoPredefinido').addEventListener('change', (e) => {
+            this.aplicarPeriodoPredefinido(e.target.value);
+        });
+
         // Botões
         document.getElementById('refreshBtn').addEventListener('click', () => {
             this.refreshData();
@@ -37,8 +42,20 @@ class DREDashboard {
             this.clearFilters();
         });
 
-        document.getElementById('exportBtn').addEventListener('click', () => {
-            this.exportData();
+        document.getElementById('exportCSVBtn').addEventListener('click', () => {
+            this.exportCSV('detalhado');
+        });
+
+        document.getElementById('exportExcelBtn').addEventListener('click', () => {
+            this.exportExcel('detalhado');
+        });
+
+        document.getElementById('exportCSVResumidoBtn').addEventListener('click', () => {
+            this.exportCSV('resumido');
+        });
+
+        document.getElementById('exportExcelResumidoBtn').addEventListener('click', () => {
+            this.exportExcel('resumido');
         });
 
         document.getElementById('cacheClearBtn').addEventListener('click', () => {
@@ -50,14 +67,67 @@ class DREDashboard {
     }
 
     setDefaultDates() {
+        // Define o período padrão como "Ano Atual"
+        document.getElementById('periodoPredefinido').value = 'ano_atual';
+        this.aplicarPeriodoPredefinido('ano_atual');
+    }
+
+    aplicarPeriodoPredefinido(periodo) {
         const hoje = new Date();
-        const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-        const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-        
-        document.getElementById('dataInicio').value = primeiroDiaMes.toISOString().split('T')[0];
-        document.getElementById('dataFim').value = ultimoDiaMes.toISOString().split('T')[0];
-        
-        console.log('📅 [Filtros] Data padrão definida para o mês atual:', {
+        let dataInicio = '';
+        let dataFim = '';
+
+        switch (periodo) {
+            case 'mes_atual':
+                dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+                dataFim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+                break;
+            case 'mes_anterior':
+                dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+                dataFim = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+                break;
+            case 'trimestre_atual':
+                const mesAtual = hoje.getMonth();
+                const trimestre = Math.floor(mesAtual / 3);
+                const mesInicioTrimestre = trimestre * 3;
+                dataInicio = new Date(hoje.getFullYear(), mesInicioTrimestre, 1);
+                dataFim = new Date(hoje.getFullYear(), mesInicioTrimestre + 3, 0);
+                break;
+            case 'semestre_atual':
+                const semestre = Math.floor(hoje.getMonth() / 6);
+                dataInicio = new Date(hoje.getFullYear(), semestre * 6, 1);
+                dataFim = new Date(hoje.getFullYear(), semestre * 6 + 6, 0);
+                break;
+            case 'ano_atual':
+                dataInicio = new Date(hoje.getFullYear(), 0, 1);
+                dataFim = new Date(hoje.getFullYear(), 11, 31);
+                break;
+            case 'ano_anterior':
+                dataInicio = new Date(hoje.getFullYear() - 1, 0, 1);
+                dataFim = new Date(hoje.getFullYear() - 1, 11, 31);
+                break;
+            case 'ultimos_30':
+                dataInicio = new Date(hoje.getTime() - (30 * 24 * 60 * 60 * 1000));
+                dataFim = hoje;
+                break;
+            case 'ultimos_90':
+                dataInicio = new Date(hoje.getTime() - (90 * 24 * 60 * 60 * 1000));
+                dataFim = hoje;
+                break;
+            case 'ultimo_ano':
+                dataInicio = new Date(hoje.getTime() - (365 * 24 * 60 * 60 * 1000));
+                dataFim = hoje;
+                break;
+            case 'custom':
+                // Não altera as datas quando selecionado "Personalizado"
+                return;
+        }
+
+        // Formata as datas para o input type="date"
+        document.getElementById('dataInicio').value = dataInicio ? dataInicio.toISOString().split('T')[0] : '';
+        document.getElementById('dataFim').value = dataFim ? dataFim.toISOString().split('T')[0] : '';
+
+        console.log(`📅 [Filtros] Período definido: ${periodo}`, {
             inicio: document.getElementById('dataInicio').value,
             fim: document.getElementById('dataFim').value
         });
@@ -168,7 +238,7 @@ class DREDashboard {
 
     updateSummaryCards(data) {
         const receitaOperacional = data.find(item => 
-            item.linha_dre.includes('RECEITA OPERACIONAL LÍQUIDA')
+            item.linha_dre.includes('RECEITA OPERACIONAL LIQUIDA')
         )?.valor_total || 0;
 
         const despesasOperacionais = data.find(item => 
@@ -179,12 +249,29 @@ class DREDashboard {
             sum + item.quantidade_lancamentos, 0
         );
 
-        const resultadoOperacional = receitaOperacional + despesasOperacionais;
+        // CPV/CMV/CSP também é uma despesa operacional
+        const cpvCmv = data.find(item => 
+            item.linha_dre.includes('CPV/CMV/CSP')
+        )?.valor_total || 0;
+
+        // OUTRAS RECEITAS OPERACIONAIS
+        const outrasReceitasOperacionais = data.find(item => 
+            item.linha_dre.includes('OUTRAS RECEITAS OPERACIONAIS')
+        )?.valor_total || 0;
+
+        // OUTRAS DESPESAS OPERACIONAIS
+        const outrasDespesasOperacionais = data.find(item => 
+            item.linha_dre.includes('OUTRAS DESPESAS OPERACIONAIS')
+        )?.valor_total || 0;
+
+        // Cálculo correto do Resultado Operacional
+        // Receita - CPV - Despesas Operacionais + Outras Receitas Operacionais - Outras Despesas Operacionais
+        const resultadoOperacional = receitaOperacional + cpvCmv + despesasOperacionais + outrasReceitasOperacionais + outrasDespesasOperacionais;
 
         document.getElementById('receitaOperacional').textContent = 
             this.formatCurrency(receitaOperacional);
         document.getElementById('despesasOperacionais').textContent = 
-            this.formatCurrency(Math.abs(despesasOperacionais));
+            this.formatCurrency(Math.abs(despesasOperacionais + cpvCmv + outrasDespesasOperacionais));
         document.getElementById('resultadoOperacional').textContent = 
             this.formatCurrency(resultadoOperacional);
         document.getElementById('totalLancamentos').textContent = 
@@ -472,26 +559,94 @@ class DREDashboard {
         }
     }
 
-    exportData() {
-        // Simular exportação
-        const data = {
-            filters: this.currentFilters,
-            timestamp: new Date().toISOString(),
-            data: 'Dados do dashboard seriam exportados aqui'
-        };
+    async exportCSV(type = 'detalhado') {
+        try {
+            this.showLoading();
+            const btn = document.getElementById('exportCSVBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Exportando...';
 
-        const blob = new Blob([JSON.stringify(data, null, 2)], 
-            { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `dre-dashboard-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+            const queryString = this.buildQueryString();
+            const url = `/api/export/csv?${queryString}&type=${type}`;
+            
+            console.log(`📊 [Export] Iniciando exportação CSV ${type}...`);
+            const startTime = performance.now();
 
-        this.showSuccess('Dados exportados com sucesso!');
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Erro na exportação');
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || `dre_export_${type}_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+
+            const endTime = performance.now();
+            console.log(`✅ [Export] CSV exportado em ${(endTime - startTime).toFixed(2)}ms`);
+
+            this.showSuccess(`Dados exportados como CSV ${type} com sucesso!`);
+
+        } catch (error) {
+            console.error('❌ [Export] Erro na exportação CSV:', error);
+            this.showError(`Falha na exportação CSV: ${error.message}`);
+        } finally {
+            const btn = document.getElementById('exportCSVBtn');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-file-csv me-2"></i>Exportar CSV';
+        }
+    }
+
+    async exportExcel(type = 'detalhado') {
+        try {
+            this.showLoading();
+            const btn = document.getElementById('exportExcelBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Exportando...';
+
+            const queryString = this.buildQueryString();
+            const url = `/api/export/excel?${queryString}&type=${type}`;
+            
+            console.log(`📊 [Export] Iniciando exportação Excel ${type}...`);
+            const startTime = performance.now();
+
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Erro na exportação');
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || `dre_export_${type}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+
+            const endTime = performance.now();
+            console.log(`✅ [Export] Excel exportado em ${(endTime - startTime).toFixed(2)}ms`);
+
+            this.showSuccess(`Dados exportados como Excel ${type} com sucesso!`);
+
+        } catch (error) {
+            console.error('❌ [Export] Erro na exportação Excel:', error);
+            this.showError(`Falha na exportação Excel: ${error.message}`);
+        } finally {
+            const btn = document.getElementById('exportExcelBtn');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-file-excel me-2"></i>Exportar Excel';
+        }
     }
 
     updateLastUpdateTime() {
