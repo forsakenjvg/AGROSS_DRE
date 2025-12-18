@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Dashboard</title>
+</head>
+<body>
+    <h1>Teste de Cálculo</h1>
+    <div id="receitaOperacional">Carregando...</div>
+    <div id="despesasOperacionais">Carregando...</div>
+    <div id="resultadoOperacional">Carregando...</div>
+    
+    <script>
+        // Simular dados da API
+        const testData = [
+            {"linha_dre":"1) ( = ) RECEITA OPERACIONAL LIQUIDA","valor_total":58503988.730000004,"quantidade_lancamentos":8390},
+            {"linha_dre":"2) ( - ) CPV/CMV/CSP","valor_total":-37661162.71,"quantidade_lancamentos":29163},
+            {"linha_dre":"3) ( - ) DESPESAS OPERACIONAIS","valor_total":-14918112.65,"quantidade_lancamentos":22342},
+            {"linha_dre":"4) ( + ) OUTRAS RECEITAS OPERACIONAIS","valor_total":792498.9600000001,"quantidade_lancamentos":165},
+            {"linha_dre":"5) ( - ) OUTRAS DESPESAS OPERACIONAIS","valor_total":-281509.6,"quantidade_lancamentos":538},
+            {"linha_dre":"6) ( + ) RECEITAS FINANCEIRAS","valor_total":253355.78999999998,"quantidade_lancamentos":533},
+            {"linha_dre":"7) ( - ) DESPESAS FINANCEIRAS","valor_total":-4341037.2,"quantidade_lancamentos":4882},
+            {"linha_dre":"8) ( +/- ) RESULTADO NAO OPERACIONAL","valor_total":-1332890.78,"quantidade_lancamentos":123},
+            {"linha_dre":"9) ( - ) PROVISAO PARA IR E CSLL","valor_total":0,"quantidade_lancamentos":0}
+        ];
+        
+        function formatCurrency(value, short = false) {
+            const num = Math.abs(value);
+            if (short && num >= 1000000) {
+                return `R$ ${(num / 1000000).toFixed(1)}M`;
+            }
+            return `R$ ${num.toLocaleString('pt-BR', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2 
+            })}`;
+        }
+        
+        function updateSummaryCards(data) {
+            const receitaOperacional = data.find(item => 
+                item.linha_dre.includes('RECEITA OPERACIONAL LÍQUIDA')
+            )?.valor_total || 0;
+
+            const despesasOperacionais = data.find(item => 
+                item.linha_dre.includes('DESPESAS OPERACIONAIS')
+            )?.valor_total || 0;
+
+            const cpvCmv = data.find(item => 
+                item.linha_dre.includes('CPV/CMV/CSP')
+            )?.valor_total || 0;
+
+            const outrasReceitasOperacionais = data.find(item => 
+                item.linha_dre.includes('OUTRAS RECEITAS OPERACIONAIS')
+            )?.valor_total || 0;
+
+            const outrasDespesasOperacionais = data.find(item => 
+                item.linha_dre.includes('OUTRAS DESPESAS OPERACIONAIS')
+            )?.valor_total || 0;
+
+            const resultadoOperacional = receitaOperacional + cpvCmv + despesasOperacionais + outrasReceitasOperacionais + outrasDespesasOperacionais;
+
+            console.log('Valores calculados:', {
+                receitaOperacional,
+                despesasOperacionais,
+                cpvCmv,
+                outrasReceitasOperacionais,
+                outrasDespesasOperacionais,
+                resultadoOperacional
+            });
+
+            document.getElementById('receitaOperacional').textContent = formatCurrency(receitaOperacional);
+            document.getElementById('despesasOperacionais').textContent = formatCurrency(Math.abs(despesasOperacionais + cpvCmv + outrasDespesasOperacionais));
+            document.getElementById('resultadoOperacional').textContent = formatCurrency(resultadoOperacional);
+        }
+        
+        updateSummaryCards(testData);
+    </script>
+</body>
+</html>

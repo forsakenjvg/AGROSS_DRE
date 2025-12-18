@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seletor de Períodos - Alternativas de Design</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 0;
+        }
+        .demo-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .demo-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .style-1 {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border: none;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+        .style-2 {
+            background: white;
+            border: 1px solid #e0e6ed;
+            border-radius: 15px;
+        }
+        .style-3 {
+            background: linear-gradient(145deg, #2c3e50, #34495e);
+            color: white;
+        }
+        .pill-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .pill-btn {
+            padding: 12px 24px;
+            border-radius: 25px;
+            border: 2px solid #e0e6ed;
+            background: white;
+            color: #5a67d8;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-align: center;
+            min-width: 120px;
+        }
+        .pill-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            border-color: #5a67d8;
+        }
+        .pill-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+        .timeline-selector {
+            position: relative;
+            padding: 20px 0;
+        }
+        .timeline-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e0e6ed;
+            margin: 0 15px;
+            display: inline-block;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .timeline-dot:hover {
+            transform: scale(1.3);
+            background: #5a67d8;
+        }
+        .timeline-dot.active {
+            background: #5a67d8;
+            box-shadow: 0 0 0 8px rgba(90, 103, 216, 0.1);
+        }
+        .timeline-dot.active::after {
+            content: attr(data-period);
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #5a67d8;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+        .timeline-line {
+            height: 2px;
+            background: #e0e6ed;
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+            z-index: -1;
+        }
+        .tab-selector {
+            border-bottom: 2px solid #e0e6ed;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 12px 24px;
+            color: #5a67d8;
+            font-weight: 600;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .tab-btn:hover {
+            color: #2c3e50;
+        }
+        .tab-btn.active {
+            color: #5a67d8;
+        }
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 2px 2px 0 0;
+        }
+        .grid-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+        }
+        .grid-item {
+            background: white;
+            border: 2px solid #e0e6ed;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .grid-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+            border-color: #667eea;
+        }
+        .grid-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+        .grid-item i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .style-3 .pill-btn,
+        .style-3 .grid-item {
+            background: #34495e;
+            border-color: #4a5f7f;
+            color: white;
+        }
+        .style-3 .pill-btn.active,
+        .style-3 .grid-item.active {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            border-color: #f39c12;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1 class="text-white text-center mb-4">
+            <i class="fas fa-calendar-alt me-3"></i>
+            Seletor de Períodos - Alternativas de Design
+        </h1>
+        
+        <!-- Estilo 1: Pills Modernas -->
+        <div class="demo-section style-1">
+            <h3><i class="fas fa-pills me-2"></i>Estilo 1: Pills Modernas</h3>
+            <div class="pill-group">
+                <div class="pill-btn" data-periodo="hoje">
+                    <i class="fas fa-sun d-block mb-1"></i>Hoje
+                </div>
+                <div class="pill-btn active" data-periodo="semana">
+                    <i class="fas fa-calendar-week d-block mb-1"></i>Esta Semana
+                </div>
+                <div class="pill-btn" data-periodo="mes">
+                    <i class="fas fa-calendar-day d-block mb-1"></i>Este Mês
+                </div>
+                <div class="pill-btn" data-periodo="trimestre">
+                    <i class="fas fa-calendar-alt d-block mb-1"></i>Trimestre
+                </div>
+                <div class="pill-btn" data-periodo="semestre">
+                    <i class="fas fa-calendar d-block mb-1"></i>Semestre
+                </div>
+                <div class="pill-btn" data-periodo="ano">
+                    <i class="fas fa-calendar-check d-block mb-1"></i>Ano
+                </div>
+            </div>
+        </div>
+        
+        <!-- Estilo 2: Timeline -->
+        <div class="demo-section style-2">
+            <h3><i class="fas fa-stream me-2"></i>Estilo 2: Timeline</h3>
+            <div class="timeline-selector">
+                <div class="timeline-line"></div>
+                <span class="timeline-dot" data-periodo="30 dias" title="Últimos 30 dias"></span>
+                <span class="timeline-dot active" data-periodo="90 dias" title="Últimos 90 dias"></span>
+                <span class="timeline-dot" data-periodo="6 meses" title="Últimos 6 meses"></span>
+                <span class="timeline-dot" data-periodo="1 ano" title="Último ano"></span>
+            </div>
+            <div class="mt-3">
+                <h5>Período selecionado: <span class="badge bg-primary" id="timeline-period">90 dias</span></h5>
+            </div>
+        </div>
+        
+        <!-- Estilo 3: Tabs -->
+        <div class="demo-section style-3">
+            <h3><i class="fas fa-folder-open me-2"></i>Estilo 3: Tabs</h3>
+            <div class="tab-selector">
+                <button class="tab-btn" data-periodo="dia">
+                    <i class="fas fa-sun me-2"></i>Dia
+                </button>
+                <button class="tab-btn active" data-periodo="semana">
+                    <i class="fas fa-calendar-week me-2"></i>Semana
+                </button>
+                <button class="tab-btn" data-periodo="mes">
+                    <i class="fas fa-calendar me-2"></i>Mês
+                </button>
+                <button class="tab-btn" data-periodo="trimestre">
+                    <i class="fas fa-calendar-alt me-2"></i>Trimestre
+                </button>
+                <button class="tab-btn" data-periodo="ano">
+                    <i class="fas fa-calendar-check me-2"></i>Ano
+                </button>
+            </div>
+        </div>
+        
+        <!-- Estilo 4: Grid -->
+        <div class="demo-section">
+            <h3><i class="fas fa-th me-2"></i>Estilo 4: Grid Cards</h3>
+            <div class="grid-selector">
+                <div class="grid-item active" data-periodo="hoje">
+                    <i class="fas fa-sun"></i>
+                    <span>Hoje</span>
+                </div>
+                <div class="grid-item" data-periodo="ontem">
+                    <i class="fas fa-history"></i>
+                    <span>Ontem</span>
+                </div>
+                <div class="grid-item" data-periodo="7dias">
+                    <i class="fas fa-calendar-week"></i>
+                    <span>7 Dias</span>
+                </div>
+                <div class="grid-item" data-periodo="30dias">
+                    <i class="fas fa-calendar-day"></i>
+                    <span>30 Dias</span>
+                </div>
+                <div class="grid-item" data-periodo="mes">
+                    <i class="fas fa-calendar"></i>
+                    <span>Este Mês</span>
+                </div>
+                <div class="grid-item" data-periodo="ano">
+                    <i class="fas fa-calendar-check"></i>
+                    <span>Este Ano</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4">
+            <a href="/" class="btn btn-light btn-lg">
+                <i class="fas fa-arrow-left me-2"></i>Voltar ao Dashboard
+            </a>
+        </div>
+    </div>
+    
+    <script>
+        // Funcionalidade para todos os seletores
+        document.addEventListener('click', (e) => {
+            // Pills
+            if (e.target.classList.contains('pill-btn')) {
+                document.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+            }
+            
+            // Timeline dots
+            if (e.target.classList.contains('timeline-dot')) {
+                document.querySelectorAll('.timeline-dot').forEach(dot => dot.classList.remove('active'));
+                e.target.classList.add('active');
+                document.getElementById('timeline-period').textContent = e.target.dataset.periodo;
+            }
+            
+            // Tabs
+            if (e.target.classList.contains('tab-btn')) {
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+            }
+            
+            // Grid items
+            if (e.target.classList.contains('grid-item') || e.target.parentElement.classList.contains('grid-item')) {
+                const item = e.target.classList.contains('grid-item') ? e.target : e.target.parentElement;
+                document.querySelectorAll('.grid-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

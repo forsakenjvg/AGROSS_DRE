@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard DRE - AGROSS</title>
     
+    <!-- SEO & Accessibility Meta Tags -->
+    <meta name="description" content="Dashboard DRE para análise financeira da AGROSS com acessibilidade WCAG AA">
+    <meta name="keywords" content="DRE, finanças, dashboard, análise, AGROSS, acessibilidade">
+    <meta name="author" content="AGROSS Team">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Chart.js -->
@@ -13,40 +19,383 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css">
+    
+    <!-- Accessibility Styles -->
+    <style>
+        /* Skip to Main Content Link for Screen Readers */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--primary-color);
+            color: white;
+            padding: 8px;
+            z-index: 10000;
+            text-decoration: none;
+            border-radius: 0 0 4px 0;
+            font-weight: 600;
+        }
+        
+        .skip-link:focus {
+            top: 0;
+        }
+        
+        /* Enhanced Focus Styles for Keyboard Navigation */
+        *:focus {
+            outline: 3px solid var(--info-color);
+            outline-offset: 2px;
+        }
+        
+        button:focus,
+        a:focus,
+        input:focus,
+        select:focus,
+        textarea:focus {
+            box-shadow: 0 0 0 3px rgba(13, 202, 240, 0.5);
+        }
+        
+        /* High Contrast Mode Support */
+        @media (prefers-contrast: high) {
+            :root {
+                --primary-color: #0066cc;
+                --danger-color: #cc0000;
+                --success-color: #006600;
+                --warning-color: #cc6600;
+                --border-color: #333333;
+            }
+        }
+        
+        /* Reduce Motion for Users Who Prefer It */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+        
+        /* Screen Reader Only Content */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* Better Color Contrast for Links */
+        a {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        a:hover,
+        a:focus {
+            color: var(--primary-color);
+            text-decoration: underline;
+        }
+        
+        /* Improved Button Accessibility */
+        button {
+            min-height: 44px;
+            min-width: 44px;
+            padding: 8px 16px;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        /* Table Accessibility */
+        th {
+            font-weight: 600;
+            text-align: left;
+        }
+        
+        td, th {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+        }
+        
+        /* Form Accessibility */
+        label {
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: block;
+        }
+        
+        input, select, textarea {
+            font-size: 16px; /* Prevents zoom on iOS */
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 12px;
+            transition: border-color 0.2s;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary-color);
+        }
+        
+        /* Error States */
+        .is-invalid {
+            border-color: var(--danger-color);
+            border-width: 3px;
+        }
+        
+        .error-message {
+            color: var(--danger-color);
+            font-weight: 600;
+            display: block;
+            margin-top: 4px;
+        }
+        
+        /* Success States */
+        .is-valid {
+            border-color: var(--success-color);
+            border-width: 3px;
+        }
+        
+        /* Loading State Accessibility */
+        .loading-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: var(--dark-color);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 4px;
+            z-index: 10001;
+            font-weight: 600;
+        }
+        
+        /* Chart Accessibility */
+        canvas {
+            border: 1px solid transparent;
+            background: white;
+        }
+        
+        .chart-description {
+            margin-top: 10px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        
+        /* Mobile Navigation Accessibility */
+        .mobile-nav-item {
+            min-height: 44px;
+        }
+        
+        /* Progress Indicator Accessibility */
+        .progress {
+            height: 20px;
+            background-color: var(--light-color);
+        }
+        
+        .progress-bar {
+            background-color: var(--primary-color);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        /* Tooltip Accessibility */
+        [data-bs-toggle="tooltip"] {
+            cursor: help;
+        }
+        
+        /* Modal Accessibility */
+        .modal-header {
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .modal-footer {
+            border-top: 2px solid var(--border-color);
+        }
+        
+        /* Pagination Accessibility */
+        .page-link {
+            min-height: 44px;
+            min-width: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
 </head>
 <body>
-    <div class="container-fluid">
+    <!-- Skip to Main Content Link -->
+    <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+    
+    <!-- Announcements for Screen Readers -->
+    <div id="announcements" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    
+    <!-- Loading Status Indicator -->
+    <div id="loadingStatus" class="loading-status sr-only" role="status" aria-live="assertive"></div>
+    
+    <div class="container-fluid" id="main-content">
         <!-- Header -->
-        <header class="row bg-primary text-white py-3 mb-4">
+        <header class="row bg-primary text-white py-3 mb-4" role="banner">
             <div class="col">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h1 class="h3 mb-0">
-                            <i class="fas fa-chart-line me-2"></i>
+                            <i class="fas fa-chart-line me-2" aria-hidden="true"></i>
                             Dashboard DRE - AGROSS
                         </h1>
                         <small class="opacity-75">Demonstração de Resultados do Exercício</small>
                     </div>
                     <div class="text-end">
-                        <div id="lastUpdate" class="small"></div>
-                        <button id="refreshBtn" class="btn btn-light btn-sm">
-                            <i class="fas fa-sync-alt"></i> Atualizar
+                        <div id="lastUpdate" class="small" aria-live="polite"></div>
+                        <button id="refreshBtn" class="btn btn-light btn-sm" 
+                                aria-label="Atualizar dados do dashboard"
+                                title="Atualizar dados do dashboard">
+                            <i class="fas fa-sync-alt" aria-hidden="true"></i> Atualizar
                         </button>
                     </div>
                 </div>
             </div>
         </header>
 
-        <!-- Filtros -->
+        <!-- Busca Avançada e Quick Filters -->
+        <section class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-search me-2"></i>Busca Avançada
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Barra de busca principal -->
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <div class="input-group">
+                                    <span class="input-group-text" id="search-addon">
+                                        <i class="fas fa-search"></i>
+                                    </span>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="searchInput" 
+                                           placeholder="Buscar por histórico, conta, departamento, valor..."
+                                           aria-label="Busca avançada"
+                                           aria-describedby="search-addon">
+                                    <button class="btn btn-outline-secondary" 
+                                            type="button" 
+                                            id="clearSearch"
+                                            title="Limpar busca">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="btn-group w-100" role="group">
+                                    <button type="button" 
+                                            class="btn btn-outline-primary flex-fill" 
+                                            id="searchBtn">
+                                        <i class="fas fa-search me-1"></i>Buscar
+                                    </button>
+                                    <button type="button" 
+                                            class="btn btn-outline-success flex-fill" 
+                                            id="saveSearchBtn"
+                                            title="Salvar busca">
+                                        <i class="fas fa-save"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Filters -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <h6 class="text-muted mb-2">
+                                    <i class="fas fa-filter me-1"></i>Filtros Rápidos:
+                                </h6>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button class="btn btn-sm btn-outline-secondary quick-filter" 
+                                            data-filter="receitas">
+                                        <i class="fas fa-arrow-up text-success me-1"></i>Apenas Receitas
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary quick-filter" 
+                                            data-filter="despesas">
+                                        <i class="fas fa-arrow-down text-danger me-1"></i>Apenas Despesas
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary quick-filter" 
+                                            data-filter="maiores_receitas">
+                                        <i class="fas fa-arrow-up text-success me-1"></i>Maiores Receitas
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary quick-filter" 
+                                            data-filter="maiores_despesas">
+                                        <i class="fas fa-arrow-down text-danger me-1"></i>Maiores Despesas
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary quick-filter" 
+                                            data-filter="ultimos_lancamentos">
+                                        <i class="fas fa-clock me-1"></i>Últimos Lançamentos
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary quick-filter" 
+                                            data-filter="lancamentos_negativos">
+                                        <i class="fas fa-exclamation-triangle text-warning me-1"></i>Lançamentos Negativos
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sugestões de busca -->
+                        <div class="row mb-3" id="searchSuggestions" style="display: none;">
+                            <div class="col-12">
+                                <div class="alert alert-info mb-0">
+                                    <small class="mb-2">
+                                        <i class="fas fa-lightbulb me-1"></i>
+                                        <strong>Sugestões de busca:</strong>
+                                    </small>
+                                    <div class="d-flex flex-wrap gap-1 mt-2">
+                                        <span class="badge bg-light text-dark search-suggestion" 
+                                              data-search="salário">"salário"</span>
+                                        <span class="badge bg-light text-dark search-suggestion" 
+                                              data-search="aluguel">"aluguel"</span>
+                                        <span class="badge bg-light text-dark search-suggestion" 
+                                              data-search="fornecedor">"fornecedor"</span>
+                                        <span class="badge bg-light text-dark search-suggestion" 
+                                              data-search="imposto">"imposto"</span>
+                                        <span class="badge bg-light text-dark search-suggestion" 
+                                              data-search="comissão">"comissão"</span>
+                                        <span class="badge bg-light text-dark search-suggestion" 
+                                              data-search=">10000">"> 10000"</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filtros Avançados -->
         <section class="row mb-4">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
                         <h5 class="card-title mb-0">
                             <i class="fas fa-filter me-2"></i>Filtros
+                            <button class="btn btn-sm btn-outline-secondary ms-2" 
+                                    type="button" 
+                                    id="toggleFilters"
+                                    title="Expandir/Contrair filtros">
+                                <i class="fas fa-chevron-up"></i>
+                            </button>
                         </h5>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body" id="filterCardBody">
                         <form id="filterForm">
                             <div class="row g-3">
                                 <div class="col-md-3">
@@ -54,17 +403,17 @@
                                     
                                     <!-- Períodos Populares em Cards -->
                                     <div class="periodo-cards mb-3">
-                                        <div class="periodo-card" data-periodo="mes_atual">
-                                            <i class="fas fa-calendar-day"></i>
-                                            <span>Mês Atual</span>
+                                        <div class="periodo-card active" data-periodo="ano_atual">
+                                            <i class="fas fa-calendar"></i>
+                                            <span>Ano Atual</span>
                                         </div>
                                         <div class="periodo-card" data-periodo="trimestre_atual">
                                             <i class="fas fa-calendar-alt"></i>
                                             <span>Trimestre</span>
                                         </div>
-                                        <div class="periodo-card" data-periodo="ano_atual">
-                                            <i class="fas fa-calendar"></i>
-                                            <span>Ano Atual</span>
+                                        <div class="periodo-card" data-periodo="mes_atual">
+                                            <i class="fas fa-calendar-day"></i>
+                                            <span>Mês Atual</span>
                                         </div>
                                     </div>
                                     
@@ -97,17 +446,27 @@
                                     <!-- Seleção Personalizada -->
                                     <div class="card periodo-custom">
                                         <div class="card-header py-2">
-                                            <h6 class="mb-0"><i class="fas fa-cog me-2"></i>Período Personalizado</h6>
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-cog me-2"></i>Período Personalizado
+                                            </h6>
                                         </div>
                                         <div class="card-body py-2">
                                             <div class="row g-2">
                                                 <div class="col-6">
                                                     <label class="form-label small">De:</label>
-                                                    <input type="date" class="form-control form-control-sm" id="dataInicio" placeholder="Data Início">
+                                                    <input type="date" 
+                                                           class="form-control form-control-sm" 
+                                                           id="dataInicio" 
+                                                           placeholder="Data Início"
+                                                           aria-label="Data início">
                                                 </div>
                                                 <div class="col-6">
                                                     <label class="form-label small">Até:</label>
-                                                    <input type="date" class="form-control form-control-sm" id="dataFim" placeholder="Data Fim">
+                                                    <input type="date" 
+                                                           class="form-control form-control-sm" 
+                                                           id="dataFim" 
+                                                           placeholder="Data Fim"
+                                                           aria-label="Data fim">
                                                 </div>
                                             </div>
                                         </div>
@@ -223,7 +582,9 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        <canvas id="deptoChart" height="250"></canvas>
+                        <div class="chart-container">
+                            <canvas id="deptoChart" height="250"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -239,7 +600,9 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        <canvas id="monthlyChart" height="120"></canvas>
+                        <div class="chart-container">
+                            <canvas id="monthlyChart" height="120"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
