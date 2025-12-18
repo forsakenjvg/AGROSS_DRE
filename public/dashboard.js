@@ -221,7 +221,7 @@ class DREDashboard {
             console.log(`✅ [Summary] Dados carregados em ${(endTime - startTime).toFixed(2)}ms`, data);
 
             this.updateSummaryCards(data);
-            this.updateDREChart(data);
+            // Gráfico DRE removido - this.updateDREChart(data);
             
         } catch (error) {
             console.error('❌ [Summary] Erro ao carregar:', error);
@@ -365,61 +365,7 @@ class DREDashboard {
         resultadoElement.className = resultadoOperacional >= 0 ? 'mb-0 text-white' : 'mb-0 text-white';
     }
 
-    updateDREChart(data) {
-        const ctx = document.getElementById('dreChart').getContext('2d');
-        
-        if (this.dreChart) {
-            this.dreChart.destroy();
-        }
-
-        const labels = data.map(item => item.linha_dre.split(') ')[1] || item.linha_dre);
-        const valores = data.map(item => item.valor_total);
-        const cores = valores.map(valor => valor >= 0 ? 'rgba(25, 135, 84, 0.8)' : 'rgba(220, 53, 69, 0.8)');
-
-        this.dreChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Valor (R$)',
-                    data: valores,
-                    backgroundColor: cores,
-                    borderColor: cores.map(cor => cor.replace('0.8', '1')),
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => {
-                                return this.formatCurrency(context.parsed.y);
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: (value) => this.formatCurrency(value, true)
-                        }
-                    },
-                    x: {
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45
-                        }
-                    }
-                }
-            }
-        });
-    }
+    // updateDREChart removido - gráfico "DRE por Linha" excluído conforme solicitado
 
     updateDepartmentChart(data) {
         const ctx = document.getElementById('deptoChart').getContext('2d');
@@ -486,35 +432,68 @@ class DREDashboard {
             return `${meses[parseInt(mesNum) - 1]}/${ano}`;
         });
 
+        // Ajustar cores para melhor visibilidade
+        const adjustedDatasets = data.datasets.map(dataset => {
+            let borderWidth = 2;
+            let pointRadius = 3;
+            let pointHoverRadius = 5;
+            
+            // Destacar categorias principais
+            if (dataset.label.includes('Receita Operacional')) {
+                borderWidth = 3;
+                pointRadius = 4;
+                pointHoverRadius = 6;
+            } else if (dataset.label.includes('CPV/CMV/CSP') || dataset.label.includes('Despesas Operacionais')) {
+                borderWidth = 2.5;
+                pointRadius = 3.5;
+                pointHoverRadius = 5.5;
+            }
+
+            return {
+                ...dataset,
+                borderWidth: borderWidth,
+                pointRadius: pointRadius,
+                pointHoverRadius: pointHoverRadius,
+                fill: false,
+                tension: 0.2
+            };
+        });
+
         this.monthlyChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: formattedLabels,
-                datasets: data.datasets.map(dataset => ({
-                    ...dataset,
-                    fill: false,
-                    tension: 0.1
-                }))
+                datasets: adjustedDatasets
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                aspectRatio: 3, // Aumentar a proporção para deixar menos achatado
                 plugins: {
                     legend: {
                         position: 'top',
                         labels: {
-                            padding: 10,
+                            padding: 15,
                             font: {
                                 size: 11
-                            }
+                            },
+                            usePointStyle: true,
+                            pointStyle: 'circle'
                         }
                     },
                     tooltip: {
                         mode: 'index',
                         intersect: false,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#ddd',
+                        borderWidth: 1,
                         callbacks: {
                             label: (context) => {
-                                return `${context.dataset.label}: ${this.formatCurrency(context.parsed.y)}`;
+                                const value = this.formatCurrency(context.parsed.y);
+                                const datasetLabel = context.dataset.label;
+                                return `${datasetLabel}: ${value}`;
                             }
                         }
                     }
@@ -524,17 +503,34 @@ class DREDashboard {
                         display: true,
                         title: {
                             display: true,
-                            text: 'Mês'
+                            text: 'Mês',
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
                         }
                     },
                     y: {
                         display: true,
                         title: {
                             display: true,
-                            text: 'Valor (R$)'
+                            text: 'Valor (R$)',
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
                         },
                         ticks: {
-                            callback: (value) => this.formatCurrency(value, true)
+                            callback: (value) => this.formatCurrency(value, true),
+                            font: {
+                                size: 10
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
                         }
                     }
                 },
@@ -542,6 +538,19 @@ class DREDashboard {
                     mode: 'nearest',
                     axis: 'x',
                     intersect: false
+                },
+                elements: {
+                    line: {
+                        borderJoinStyle: 'round'
+                    }
+                },
+                layout: {
+                    padding: {
+                        top: 10,
+                        right: 10,
+                        bottom: 10,
+                        left: 10
+                    }
                 }
             }
         });
@@ -563,42 +572,25 @@ class DREDashboard {
     }
 
     updateDetailedTable(data) {
-        const tbody = document.getElementById('dataTable');
+        // Armazenar todos os dados para ordenação
+        this.currentTableData = data || [];
         
-        if (!data || data.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="text-center text-muted">
-                        <i class="fas fa-inbox fa-2x mb-2"></i>
-                        <div>Nenhum registro encontrado</div>
-                    </td>
-                </tr>
-            `;
-            return;
+        // Aplicar ordenação atual se houver
+        if (this.sortColumn) {
+            this.ordenarTabela(this.sortColumn);
+        } else {
+            this.displayTableData();
         }
-
-        tbody.innerHTML = data.map(item => `
-            <tr class="fade-in">
-                <td>${this.formatDate(item.data)}</td>
-                <td><small>${item.linha_dre}</small></td>
-                <td><span class="badge bg-secondary">${item.departamento}</span></td>
-                <td><small>${item.conta_contabil}</small></td>
-                <td class="${item.vl_rateado >= 0 ? 'valor-positive' : 'valor-negative'}">
-                    ${this.formatCurrency(item.vl_rateado)}
-                </td>
-                <td><span class="badge bg-${item.tipo === 'DÉBITO' ? 'danger' : 'primary'}">${item.tipo}</span></td>
-                <td><small class="text-muted">${item.historico_contabil || '-'}</small></td>
-            </tr>
-        `).join('');
-
+        
         document.getElementById('recordCount').textContent = 
-            `${data.length} registros`;
+            `${this.currentTableData.length} registros`;
     }
 
-    updatePagination(pagination) {
+    updatePagination(totalRecords) {
         const paginationEl = document.getElementById('pagination');
+        const totalPages = Math.ceil(totalRecords / this.pageSize);
         
-        if (pagination.totalPages <= 1) {
+        if (totalPages <= 1) {
             paginationEl.innerHTML = '';
             return;
         }
@@ -607,35 +599,42 @@ class DREDashboard {
         
         // Previous
         html += `
-            <li class="page-item ${pagination.page <= 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="dashboard.loadDetailedData(${pagination.page - 1})">
+            <li class="page-item ${this.currentPage <= 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="dashboard.goToPage(${this.currentPage - 1})">
                     <i class="fas fa-chevron-left"></i>
                 </a>
             </li>
         `;
 
         // Page numbers
-        const startPage = Math.max(1, pagination.page - 2);
-        const endPage = Math.min(pagination.totalPages, pagination.page + 2);
+        const startPage = Math.max(1, this.currentPage - 2);
+        const endPage = Math.min(totalPages, this.currentPage + 2);
 
         for (let i = startPage; i <= endPage; i++) {
             html += `
-                <li class="page-item ${i === pagination.page ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="dashboard.loadDetailedData(${i})">${i}</a>
+                <li class="page-item ${i === this.currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="dashboard.goToPage(${i})">${i}</a>
                 </li>
             `;
         }
 
         // Next
         html += `
-            <li class="page-item ${pagination.page >= pagination.totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="dashboard.loadDetailedData(${pagination.page + 1})">
+            <li class="page-item ${this.currentPage >= totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="dashboard.goToPage(${this.currentPage + 1})">
                     <i class="fas fa-chevron-right"></i>
                 </a>
             </li>
         `;
 
         paginationEl.innerHTML = html;
+    }
+
+    goToPage(page) {
+        if (page >= 1) {
+            this.currentPage = page;
+            this.displayTableData();
+        }
     }
 
     applyInitialFilters() {
@@ -882,6 +881,111 @@ class DREDashboard {
         if (!dateString) return '-';
         const date = new Date(dateString);
         return date.toLocaleDateString('pt-BR');
+    }
+    ordenarTabela(column) {
+        // Se clicar na mesma coluna, inverte a direção
+        if (this.sortColumn === column) {
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sortColumn = column;
+            this.sortDirection = 'asc';
+        }
+
+        // Atualizar ícones
+        this.updateSortIcons();
+
+        // Reordenar dados
+        this.currentTableData.sort((a, b) => {
+            let valueA = a[column];
+            let valueB = b[column];
+
+            // Tratar valores nulos ou indefinidos
+            if (valueA == null) valueA = '';
+            if (valueB == null) valueB = '';
+
+            // Converter para comparação
+            if (column === 'data') {
+                valueA = new Date(valueA);
+                valueB = new Date(valueB);
+            } else if (column === 'vl_rateado') {
+                valueA = parseFloat(valueA) || 0;
+                valueB = parseFloat(valueB) || 0;
+            } else {
+                valueA = String(valueA).toLowerCase();
+                valueB = String(valueB).toLowerCase();
+            }
+
+            // Comparar
+            if (valueA < valueB) {
+                return this.sortDirection === 'asc' ? -1 : 1;
+            }
+            if (valueA > valueB) {
+                return this.sortDirection === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+
+        // Atualizar tabela
+        this.displayTableData();
+    }
+
+    updateSortIcons() {
+        // Limpar todos os ícones
+        document.querySelectorAll('th.sortable i').forEach(icon => {
+            icon.className = 'fas fa-sort';
+        });
+
+        // Atualizar ícone da coluna ativa
+        if (this.sortColumn) {
+            const activeTh = document.querySelector(`th[data-column="${this.sortColumn}"]`);
+            if (activeTh) {
+                const icon = activeTh.querySelector('i');
+                if (icon) {
+                    icon.className = this.sortDirection === 'asc' ? 'fas fa-sort-asc' : 'fas fa-sort-desc';
+                }
+            }
+        }
+    }
+
+    displayTableData() {
+        const tbody = document.getElementById('dataTable');
+        const start = (this.currentPage - 1) * this.pageSize;
+        const end = start + this.pageSize;
+        const pageData = this.currentTableData.slice(start, end);
+
+        if (pageData.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center text-muted">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>Nenhum registro encontrado para este período.</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = pageData.map(row => `
+            <tr>
+                <td>${this.formatDate(row.data)}</td>
+                <td>${row.linha_dre || '-'}</td>
+                <td>${row.departamento || '-'}</td>
+                <td>${row.conta_contabil || '-'}</td>
+                <td class="${row.vl_rateado >= 0 ? 'valor-positive' : 'valor-negative'}">
+                    ${this.formatCurrency(row.vl_rateado)}
+                </td>
+                <td>
+                    <span class="badge ${row.tipo === 'DEBITO' ? 'bg-danger' : 'bg-success'}">
+                        ${row.tipo || '-'}
+                    </span>
+                </td>
+                <td title="${(row.historico_contabil || '').replace(/"/g, '&quot;')}">
+                    ${this.truncateText(row.historico_contabil || '-', 50)}
+                </td>
+            </tr>
+        `).join('');
+
+        this.updatePagination(this.currentTableData.length);
     }
 }
 
